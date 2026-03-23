@@ -1,0 +1,7 @@
+{
+    "productId": "chair01",
+    "title": "Soft Chair",
+    "basePrice": 450,
+    "modelUrl": "clients/demo/products/chair01/model.glb",
+    "baseTextureUrl": "clients/demo/products/chair01/albedo.jpg"
+}
