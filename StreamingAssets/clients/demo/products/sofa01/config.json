@@ -1,8 +1,0 @@
-{
-        "productId": "sofa01",
-        "title": "Modern Sofa",
-        "basePrice": 1000,
-        "modelUrl": "clients/demo/products/sofa01/model.glb",
-        "baseTextureUrl": "clients/demo/products/sofa01/albedo.png",
-        "normalTextureUrl": "clients/demo/products/sofa01/normal.png"
-}
