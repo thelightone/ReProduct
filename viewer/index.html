@@ -31,7 +31,7 @@
         }
 
         .loader {
-            width: 260px;
+            width: 280px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -59,6 +59,7 @@
             background: rgba(255,255,255,0.15);
             border-radius: 999px;
             overflow: hidden;
+            position: relative;
         }
 
         .progress-fill {
@@ -67,6 +68,13 @@
             background: white;
             transition: width 0.15s ease;
         }
+
+            .progress-fill.indeterminate {
+                width: 40%;
+                position: absolute;
+                left: -40%;
+                animation: indeterminate 1.2s linear infinite;
+            }
 
         .progress-text {
             font-size: 14px;
@@ -96,6 +104,16 @@
                 transform: rotate(360deg);
             }
         }
+
+        @keyframes indeterminate {
+            0% {
+                left: -40%;
+            }
+
+            100% {
+                left: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -105,9 +123,9 @@
                 <div class="spinner"></div>
                 <div class="text" id="loading-text">Loading 3D...</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill"></div>
+                    <div class="progress-fill indeterminate" id="progress-fill"></div>
                 </div>
-                <div class="progress-text" id="progress-text">0%</div>
+                <div class="progress-text" id="progress-text">Starting...</div>
             </div>
         </div>
 
@@ -127,9 +145,17 @@
         const errorEl = document.getElementById('error');
 
         function setProgress(percent, text = 'Loading 3D...') {
+            progressFillEl.classList.remove('indeterminate');
             const clamped = Math.max(0, Math.min(100, Math.round(percent)));
             progressFillEl.style.width = clamped + '%';
             progressTextEl.textContent = clamped + '%';
+            loadingTextEl.textContent = text;
+        }
+
+        function setIndeterminate(text = 'Loading 3D...') {
+            progressFillEl.classList.add('indeterminate');
+            progressFillEl.style.width = '40%';
+            progressTextEl.textContent = 'Loading...';
             loadingTextEl.textContent = text;
         }
 
@@ -219,7 +245,7 @@
                     throw new Error('config.json has no modelUrl');
                 }
 
-                setProgress(15, 'Loading model...');
+                setIndeterminate('Loading model...');
 
                 const modelUrl = getModelUrl(config.modelUrl);
                 const loader = new GLTFLoader();
@@ -229,12 +255,12 @@
                         modelUrl,
                         resolve,
                         (event) => {
-                            if (event.total) {
+                            if (event.total && event.total > 0) {
                                 const modelProgress = event.loaded / event.total;
                                 const percent = 15 + modelProgress * 80;
                                 setProgress(percent, 'Loading model...');
                             } else {
-                                setProgress(50, 'Loading model...');
+                                setIndeterminate('Loading model...');
                             }
                         },
                         reject
