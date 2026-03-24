@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Viewer Embed Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: Arial, sans-serif;
+      background: #f3f3f3;
+    }
+
+    .viewer-wrap {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 720px;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-wrap">
+    <iframe
+      src="https://thelightone.github.io/ReProduct/"
+      loading="lazy"
+      allowfullscreen>
+    </iframe>
+  </div>
+</body>
+</html>
