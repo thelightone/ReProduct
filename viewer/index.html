@@ -93,6 +93,7 @@
             display: none;
             z-index: 20;
             white-space: pre-wrap;
+            font-size: 14px;
         }
 
         canvas {
@@ -121,7 +122,7 @@
         <div id="loading">
             <div class="loader">
                 <div class="spinner"></div>
-                <div class="text" id="loading-text">Loading 3D...</div>
+                <div class="text" id="loading-text">Starting...</div>
                 <div class="progress-bar">
                     <div class="progress-fill indeterminate" id="progress-fill"></div>
                 </div>
@@ -132,73 +133,104 @@
         <div id="error"></div>
     </div>
 
-    <script type="module">
-        import * as THREE from 'https://unpkg.com/three@0.179.1/build/three.module.js';
-        import { OrbitControls } from 'https://unpkg.com/three@0.179.1/examples/jsm/controls/OrbitControls.js';
-        import { GLTFLoader } from 'https://unpkg.com/three@0.179.1/examples/jsm/loaders/GLTFLoader.js';
+    <script>
+        window.addEventListener('error', (e) => {
+            const errorEl = document.getElementById('error');
+            const loadingTextEl = document.getElementById('loading-text');
+            const progressTextEl = document.getElementById('progress-text');
 
-        const app = document.getElementById('app');
-        const loadingEl = document.getElementById('loading');
+            loadingTextEl.textContent = 'JS error';
+            progressTextEl.textContent = 'Failed';
+            errorEl.style.display = 'block';
+            errorEl.textContent = `window.error:\n${e.message}\n${e.filename || ''}:${e.lineno || ''}`;
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            const errorEl = document.getElementById('error');
+            const loadingTextEl = document.getElementById('loading-text');
+            const progressTextEl = document.getElementById('progress-text');
+
+            loadingTextEl.textContent = 'Promise error';
+            progressTextEl.textContent = 'Failed';
+            errorEl.style.display = 'block';
+            errorEl.textContent = `unhandledrejection:\n${e.reason}`;
+        });
+    </script>
+
+    <script type="module">
         const loadingTextEl = document.getElementById('loading-text');
         const progressFillEl = document.getElementById('progress-fill');
         const progressTextEl = document.getElementById('progress-text');
         const errorEl = document.getElementById('error');
 
-        function setProgress(percent, text = 'Loading 3D...') {
+        function setProgress(percent, text = 'Loading...') {
             progressFillEl.classList.remove('indeterminate');
             const clamped = Math.max(0, Math.min(100, Math.round(percent)));
             progressFillEl.style.width = clamped + '%';
             progressTextEl.textContent = clamped + '%';
             loadingTextEl.textContent = text;
+            console.log('progress:', clamped, text);
         }
 
-        function setIndeterminate(text = 'Loading 3D...') {
+        function setIndeterminate(text = 'Loading...') {
             progressFillEl.classList.add('indeterminate');
             progressFillEl.style.width = '40%';
             progressTextEl.textContent = 'Loading...';
             loadingTextEl.textContent = text;
+            console.log('indeterminate:', text);
         }
 
         function showError(message) {
             console.error(message);
             errorEl.style.display = 'block';
             errorEl.textContent = String(message);
-            loadingEl.style.display = 'none';
+            loadingTextEl.textContent = 'Error';
+            progressTextEl.textContent = 'Failed';
         }
 
-        function getParam(name, fallback = '') {
-            const params = new URLSearchParams(window.location.search);
-            return params.get(name) || fallback;
-        }
+        try {
+            setProgress(1, 'Loading Three.js...');
 
-        function getConfigUrl(client, product) {
-            return `./StreamingAssets/clients/${encodeURIComponent(client)}/products/${encodeURIComponent(product)}/config.json`;
-        }
+            const THREE = await import('https://unpkg.com/three@0.179.1/build/three.module.js');
+            const { OrbitControls } = await import('https://unpkg.com/three@0.179.1/examples/jsm/controls/OrbitControls.js');
+            const { GLTFLoader } = await import('https://unpkg.com/three@0.179.1/examples/jsm/loaders/GLTFLoader.js');
 
-        function getModelUrl(relativePath) {
-            return `./StreamingAssets/${relativePath}`;
-        }
+            setProgress(5, 'Three.js loaded');
 
-        function frameObject(camera, controls, object) {
-            const box = new THREE.Box3().setFromObject(object);
-            const size = box.getSize(new THREE.Vector3());
-            const center = box.getCenter(new THREE.Vector3());
+            const app = document.getElementById('app');
 
-            const maxSize = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            let distance = maxSize / (2 * Math.tan(fov / 2));
-            distance *= 1.6;
+            function getParam(name, fallback = '') {
+                const params = new URLSearchParams(window.location.search);
+                return params.get(name) || fallback;
+            }
 
-            camera.position.set(center.x, center.y + maxSize * 0.15, center.z + distance);
-            camera.near = Math.max(distance / 100, 0.01);
-            camera.far = distance * 100;
-            camera.updateProjectionMatrix();
+            function getConfigUrl(client, product) {
+                return `./StreamingAssets/clients/${encodeURIComponent(client)}/products/${encodeURIComponent(product)}/config.json`;
+            }
 
-            controls.target.copy(center);
-            controls.update();
-        }
+            function getModelUrl(relativePath) {
+                return `./StreamingAssets/${relativePath}`;
+            }
 
-        async function main() {
+            function frameObject(camera, controls, object) {
+                const box = new THREE.Box3().setFromObject(object);
+                const size = box.getSize(new THREE.Vector3());
+                const center = box.getCenter(new THREE.Vector3());
+
+                const maxSize = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let distance = maxSize / (2 * Math.tan(fov / 2));
+                distance *= 1.6;
+
+                camera.position.set(center.x, center.y + maxSize * 0.15, center.z + distance);
+                camera.near = Math.max(distance / 100, 0.01);
+                camera.far = distance * 100;
+                camera.updateProjectionMatrix();
+
+                controls.target.copy(center);
+                controls.update();
+            }
+
             const client = getParam('client', 'demo');
             const product = getParam('product', 'sofa01');
 
@@ -229,66 +261,62 @@
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
 
-            try {
-                setProgress(5, 'Loading config...');
+            setProgress(10, 'Loading config...');
 
-                const configUrl = getConfigUrl(client, product);
-                const configRes = await fetch(configUrl);
+            const configUrl = getConfigUrl(client, product);
+            const configRes = await fetch(configUrl);
 
-                if (!configRes.ok) {
-                    throw new Error(`Failed to load config.json: ${configRes.status} ${configRes.statusText}`);
-                }
-
-                const config = await configRes.json();
-
-                if (!config.modelUrl) {
-                    throw new Error('config.json has no modelUrl');
-                }
-
-                setIndeterminate('Loading model...');
-
-                const modelUrl = getModelUrl(config.modelUrl);
-                const loader = new GLTFLoader();
-
-                const gltf = await new Promise((resolve, reject) => {
-                    loader.load(
-                        modelUrl,
-                        resolve,
-                        (event) => {
-                            if (event.total && event.total > 0) {
-                                const modelProgress = event.loaded / event.total;
-                                const percent = 15 + modelProgress * 80;
-                                setProgress(percent, 'Loading model...');
-                            } else {
-                                setIndeterminate('Loading model...');
-                            }
-                        },
-                        reject
-                    );
-                });
-
-                setProgress(97, 'Preparing scene...');
-
-                const model = gltf.scene;
-                scene.add(model);
-                frameObject(camera, controls, model);
-
-                setProgress(100, 'Done');
-
-                setTimeout(() => {
-                    loadingEl.style.display = 'none';
-                }, 150);
-
-                renderer.setAnimationLoop(() => {
-                    controls.update();
-                    renderer.render(scene, camera);
-                });
-            } catch (err) {
-                showError(err);
+            if (!configRes.ok) {
+                throw new Error(`Failed to load config.json: ${configRes.status} ${configRes.statusText}\n${configUrl}`);
             }
-        }
 
-        main();
+            const config = await configRes.json();
+
+            if (!config.modelUrl) {
+                throw new Error('config.json has no modelUrl');
+            }
+
+            setIndeterminate('Loading model...');
+
+            const modelUrl = getModelUrl(config.modelUrl);
+            const loader = new GLTFLoader();
+
+            const gltf = await new Promise((resolve, reject) => {
+                loader.load(
+                    modelUrl,
+                    resolve,
+                    (event) => {
+                        if (event.total && event.total > 0) {
+                            const modelProgress = event.loaded / event.total;
+                            const percent = 15 + modelProgress * 80;
+                            setProgress(percent, 'Loading model...');
+                        } else {
+                            setIndeterminate('Loading model...');
+                        }
+                    },
+                    reject
+                );
+            });
+
+            setProgress(97, 'Preparing scene...');
+
+            const model = gltf.scene;
+            scene.add(model);
+            frameObject(camera, controls, model);
+
+            setProgress(100, 'Done');
+
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 150);
+
+            renderer.setAnimationLoop(() => {
+                controls.update();
+                renderer.render(scene, camera);
+            });
+        } catch (err) {
+            showError(err);
+        }
     </script>
 </body>
 </html>
