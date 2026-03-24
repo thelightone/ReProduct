@@ -26,9 +26,51 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
             background: #1e1e1e;
             z-index: 10;
+        }
+
+        .loader {
+            width: 260px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            color: white;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .text {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: white;
+            transition: width 0.15s ease;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            opacity: 0.85;
         }
 
         #error {
@@ -48,11 +90,27 @@
         canvas {
             display: block;
         }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <div id="loading">Loading 3D...</div>
+        <div id="loading">
+            <div class="loader">
+                <div class="spinner"></div>
+                <div class="text" id="loading-text">Loading 3D...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">0%</div>
+            </div>
+        </div>
+
         <div id="error"></div>
     </div>
 
@@ -63,7 +121,17 @@
 
         const app = document.getElementById('app');
         const loadingEl = document.getElementById('loading');
+        const loadingTextEl = document.getElementById('loading-text');
+        const progressFillEl = document.getElementById('progress-fill');
+        const progressTextEl = document.getElementById('progress-text');
         const errorEl = document.getElementById('error');
+
+        function setProgress(percent, text = 'Loading 3D...') {
+            const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+            progressFillEl.style.width = clamped + '%';
+            progressTextEl.textContent = clamped + '%';
+            loadingTextEl.textContent = text;
+        }
 
         function showError(message) {
             console.error(message);
@@ -136,6 +204,8 @@
             });
 
             try {
+                setProgress(5, 'Loading config...');
+
                 const configUrl = getConfigUrl(client, product);
                 const configRes = await fetch(configUrl);
 
@@ -149,16 +219,39 @@
                     throw new Error('config.json has no modelUrl');
                 }
 
+                setProgress(15, 'Loading model...');
+
                 const modelUrl = getModelUrl(config.modelUrl);
-
                 const loader = new GLTFLoader();
-                const gltf = await loader.loadAsync(modelUrl);
-                const model = gltf.scene;
 
+                const gltf = await new Promise((resolve, reject) => {
+                    loader.load(
+                        modelUrl,
+                        resolve,
+                        (event) => {
+                            if (event.total) {
+                                const modelProgress = event.loaded / event.total;
+                                const percent = 15 + modelProgress * 80;
+                                setProgress(percent, 'Loading model...');
+                            } else {
+                                setProgress(50, 'Loading model...');
+                            }
+                        },
+                        reject
+                    );
+                });
+
+                setProgress(97, 'Preparing scene...');
+
+                const model = gltf.scene;
                 scene.add(model);
                 frameObject(camera, controls, model);
 
-                loadingEl.style.display = 'none';
+                setProgress(100, 'Done');
+
+                setTimeout(() => {
+                    loadingEl.style.display = 'none';
+                }, 150);
 
                 renderer.setAnimationLoop(() => {
                     controls.update();
