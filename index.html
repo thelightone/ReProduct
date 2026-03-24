@@ -1,55 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Product Viewer</title>
+    <meta charset="utf-8">
+    <title>Viewer</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
-        body {
+        html, body {
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        h1 {
-            margin-bottom: 10px;
-        }
-
-        .viewer {
-            border-radius: 16px;
-            overflow: hidden;
-            background: #ddd;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
-        iframe {
+            padding: 0;
             width: 100%;
-            height: 700px;
-            border: none;
+            height: 100%;
+            overflow: hidden;
+            background: #1e1e1e;
+        }
+
+        #unity-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #unity-canvas {
+            width: 100%;
+            height: 100%;
             display: block;
+        }
+
+        #loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            background: #1e1e1e;
+            z-index: 10;
         }
     </style>
 </head>
+
 <body>
-
-    <div class="container">
-        <h1>Modern Sofa</h1>
-        <p>3D preview of the product</p>
-
-        <div class="viewer">
-            <iframe src="./viewer/index.html?client=demo&product=sofa01"
-                    loading="lazy"
-                    allowfullscreen>
-            </iframe>
-        </div>
+    <div id="unity-container">
+        <canvas id="unity-canvas"></canvas>
+        <div id="loading">Loading 3D...</div>
     </div>
 
+    <script>
+    const buildUrl = "Build";
+    const loaderUrl = buildUrl + "/Builds.loader.js";
+
+    const config = {
+      dataUrl: buildUrl + "/Builds.data",
+      frameworkUrl: buildUrl + "/Builds.framework.js",
+      codeUrl: buildUrl + "/Builds.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "Viewer",
+      productVersion: "1.0"
+    };
+
+    const canvas = document.querySelector("#unity-canvas");
+    const loading = document.querySelector("#loading");
+
+    const script = document.createElement("script");
+    script.src = loaderUrl;
+
+    script.onload = () => {
+      createUnityInstance(canvas, config).then(() => {
+        loading.style.display = "none";
+      }).catch((message) => {
+        alert(message);
+      });
+    };
+
+    document.body.appendChild(script);
+    </script>
 </body>
 </html>
