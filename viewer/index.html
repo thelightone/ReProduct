@@ -1,30 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <meta charset="utf-8" />
+    <title>3D Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
         html, body {
             margin: 0;
-            padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
             background: #1e1e1e;
+            font-family: Arial, sans-serif;
         }
 
-        #unity-container {
-            width: 100%;
-            height: 100%;
+        #app {
             position: relative;
-        }
-
-        #unity-canvas {
             width: 100%;
             height: 100%;
-            display: block;
         }
 
         #loading {
@@ -33,117 +26,150 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            color: white;
             background: #1e1e1e;
             z-index: 10;
         }
 
-        .loader {
-            width: 260px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
+        #error {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            padding: 12px 14px;
             color: white;
-            font-family: Arial, sans-serif;
+            background: rgba(180, 40, 40, 0.95);
+            border-radius: 10px;
+            display: none;
+            z-index: 20;
+            white-space: pre-wrap;
         }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255,255,255,0.2);
-            border-top: 4px solid white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        .text {
-            font-size: 16px;
-            opacity: 0.95;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255,255,255,0.15);
-            border-radius: 999px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            width: 0%;
-            height: 100%;
-            background: white;
-            transition: width 0.15s ease;
-        }
-
-        .progress-text {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+        canvas {
+            display: block;
         }
     </style>
 </head>
-
 <body>
-    <div id="unity-container">
-        <canvas id="unity-canvas"></canvas>
-
-        <div id="loading">
-            <div class="loader">
-                <div class="spinner"></div>
-                <div class="text">Loading 3D...</div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill"></div>
-                </div>
-                <div class="progress-text" id="progress-text">0%</div>
-            </div>
-        </div>
+    <div id="app">
+        <div id="loading">Loading 3D...</div>
+        <div id="error"></div>
     </div>
 
-    <script>
-        const buildUrl = "Build";
-        const loaderUrl = buildUrl + "/Builds.loader.js";
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.179.1/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.179.1/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://unpkg.com/three@0.179.1/examples/jsm/loaders/GLTFLoader.js';
 
-        const config = {
-            dataUrl: buildUrl + "/Builds.data",
-            frameworkUrl: buildUrl + "/Builds.framework.js",
-            codeUrl: buildUrl + "/Builds.wasm",
-            streamingAssetsUrl: "StreamingAssets",
-            companyName: "DefaultCompany",
-            productName: "Viewer",
-            productVersion: "1.0"
-        };
+        const app = document.getElementById('app');
+        const loadingEl = document.getElementById('loading');
+        const errorEl = document.getElementById('error');
 
-        const canvas = document.querySelector("#unity-canvas");
-        const loading = document.querySelector("#loading");
-        const progressFill = document.querySelector("#progress-fill");
-        const progressText = document.querySelector("#progress-text");
+        function showError(message) {
+            console.error(message);
+            errorEl.style.display = 'block';
+            errorEl.textContent = String(message);
+            loadingEl.style.display = 'none';
+        }
 
-        const script = document.createElement("script");
-        script.src = loaderUrl;
+        function getParam(name, fallback = '') {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || fallback;
+        }
 
-        script.onload = () => {
-            createUnityInstance(canvas, config, (progress) => {
-                const percent = Math.round(progress * 100);
-                progressFill.style.width = percent + "%";
-                progressText.textContent = percent + "%";
-            }).then(() => {
-                loading.style.display = "none";
-            }).catch((message) => {
-                alert(message);
+        function getConfigUrl(client, product) {
+            return `./StreamingAssets/clients/${encodeURIComponent(client)}/products/${encodeURIComponent(product)}/config.json`;
+        }
+
+        function getModelUrl(relativePath) {
+            return `./StreamingAssets/${relativePath}`;
+        }
+
+        function frameObject(camera, controls, object) {
+            const box = new THREE.Box3().setFromObject(object);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
+            const maxSize = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let distance = maxSize / (2 * Math.tan(fov / 2));
+            distance *= 1.6;
+
+            camera.position.set(center.x, center.y + maxSize * 0.15, center.z + distance);
+            camera.near = Math.max(distance / 100, 0.01);
+            camera.far = distance * 100;
+            camera.updateProjectionMatrix();
+
+            controls.target.copy(center);
+            controls.update();
+        }
+
+        async function main() {
+            const client = getParam('client', 'demo');
+            const product = getParam('product', 'sofa01');
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            app.appendChild(renderer.domElement);
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1e1e1e);
+
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+            scene.add(ambient);
+
+            const dir = new THREE.DirectionalLight(0xffffff, 2.0);
+            dir.position.set(3, 5, 4);
+            scene.add(dir);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
             });
-        };
 
-        script.onerror = () => {
-            alert("Failed to load Unity loader: " + loaderUrl);
-        };
+            try {
+                const configUrl = getConfigUrl(client, product);
+                const configRes = await fetch(configUrl);
 
-        document.body.appendChild(script);
+                if (!configRes.ok) {
+                    throw new Error(`Failed to load config.json: ${configRes.status} ${configRes.statusText}`);
+                }
+
+                const config = await configRes.json();
+
+                if (!config.modelUrl) {
+                    throw new Error('config.json has no modelUrl');
+                }
+
+                const modelUrl = getModelUrl(config.modelUrl);
+
+                const loader = new GLTFLoader();
+                const gltf = await loader.loadAsync(modelUrl);
+                const model = gltf.scene;
+
+                scene.add(model);
+                frameObject(camera, controls, model);
+
+                loadingEl.style.display = 'none';
+
+                renderer.setAnimationLoop(() => {
+                    controls.update();
+                    renderer.render(scene, camera);
+                });
+            } catch (err) {
+                showError(err);
+            }
+        }
+
+        main();
     </script>
 </body>
 </html>
