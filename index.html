@@ -106,14 +106,14 @@
     </div>
 
     <script>
-        const buildUrl = "Build";
+        const buildUrl = "viewer/Build";
         const loaderUrl = buildUrl + "/Builds.loader.js";
 
         const config = {
             dataUrl: buildUrl + "/Builds.data",
             frameworkUrl: buildUrl + "/Builds.framework.js",
             codeUrl: buildUrl + "/Builds.wasm",
-            streamingAssetsUrl: "StreamingAssets",
+            streamingAssetsUrl: "viewer/StreamingAssets",
             companyName: "DefaultCompany",
             productName: "Viewer",
             productVersion: "1.0"
@@ -137,6 +137,10 @@
             }).catch((message) => {
                 alert(message);
             });
+        };
+
+        script.onerror = () => {
+            alert("Failed to load Unity loader script: " + loaderUrl);
         };
 
         document.body.appendChild(script);
