@@ -8,20 +8,25 @@
     <style>
         html, body {
             margin: 0;
+            width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: sans-serif;
         }
 
         #viewer-wrap {
+            position: relative;
             width: 100vw;
             height: 100vh;
-            /* радиальный градиент: светлее в центре */
-            background: radial-gradient( circle at center, #ffffff 0%, #eeeeee 35%, #d6d6d6 65%, #bcbcbc 100% );
-            position: relative;
+            /* радиальный градиент */
+            background: radial-gradient( circle at center, #f5f5f5 0%, #e0e0e0 40%, #c8c8c8 70%, #a8a8a8 100% );
         }
 
         canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: block;
         }
 
@@ -41,7 +46,6 @@
             width: 0%;
             height: 100%;
             background: #555;
-            transition: width 0.2s;
         }
     </style>
 </head>
@@ -58,9 +62,11 @@
         import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
         import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
         import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
-        import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/RGBELoader.js';
 
         const canvas = document.getElementById('viewer');
+        const progressBar = document.getElementById('progress');
+        const loader = document.getElementById('loader');
+
         const renderer = new THREE.WebGLRenderer({
             canvas,
             antialias: true,
@@ -72,67 +78,50 @@
         renderer.setClearColor(0x000000, 0);
 
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         const scene = new THREE.Scene();
 
         const camera = new THREE.PerspectiveCamera(
             45,
             window.innerWidth / window.innerHeight,
-            0.1,
+            0.01,
             1000
         );
-        camera.position.set(2, 1.5, 3);
+        camera.position.set(0, 1.5, 3);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // свет
-        const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+        // свет (простой и стабильный)
+        const ambient = new THREE.AmbientLight(0xffffff, 1.5);
         scene.add(ambient);
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 2);
         dirLight.position.set(3, 5, 4);
         dirLight.castShadow = true;
-
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
-
         scene.add(dirLight);
 
-        // пол для тени
+        // пол (тень)
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(20, 20),
             new THREE.ShadowMaterial({ opacity: 0.2 })
         );
         floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -0.001;
+        floor.position.y = 0;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // загрузка HDRI (для нормальных отражений)
-        const pmremGenerator = new THREE.PMREMGenerator(renderer);
-        new RGBELoader().load(
-            'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_03_1k.hdr',
-            (hdr) => {
-                const envMap = pmremGenerator.fromEquirectangular(hdr).texture;
-                scene.environment = envMap;
-                hdr.dispose();
-                pmremGenerator.dispose();
-            }
-        );
-
-        // загрузка модели
+        // параметры
         const params = new URLSearchParams(window.location.search);
         const client = params.get('client') || 'demo';
         const product = params.get('product') || 'chair01';
 
         const modelUrl = `./StreamingAssets/clients/${client}/products/${product}/model.glb`;
+        console.log('Loading:', modelUrl);
 
-        const loader = new GLTFLoader();
-        const progressBar = document.getElementById('progress');
+        const loaderGLTF = new GLTFLoader();
 
-        loader.load(
+        loaderGLTF.load(
             modelUrl,
             (gltf) => {
                 const model = gltf.scene;
@@ -144,18 +133,30 @@
                     }
                 });
 
-                // центрируем модель
+                // центрирование
                 const box = new THREE.Box3().setFromObject(model);
                 const center = box.getCenter(new THREE.Vector3());
-                model.position.sub(center);
-
-                // ставим на пол
                 const size = box.getSize(new THREE.Vector3());
+
+                model.position.sub(center);
                 model.position.y += size.y / 2;
 
                 scene.add(model);
 
-                document.getElementById('loader').style.display = 'none';
+                // подгон камеры
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+
+                cameraZ *= 1.8;
+                camera.position.set(0, maxDim * 0.6, cameraZ);
+
+                controls.target.set(0, size.y / 2, 0);
+                controls.update();
+
+                loader.style.display = 'none';
+
+                console.log('MODEL LOADED');
             },
             (xhr) => {
                 if (xhr.total) {
@@ -164,18 +165,16 @@
                 }
             },
             (err) => {
-                console.error('Load error:', err);
+                console.error('ERROR:', err);
             }
         );
 
-        // ресайз
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // рендер
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
