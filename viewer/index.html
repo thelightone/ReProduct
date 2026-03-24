@@ -8,57 +8,40 @@
     <style>
         html, body {
             margin: 0;
-            width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: sans-serif;
         }
 
         #viewer-wrap {
-            position: relative;
             width: 100vw;
             height: 100vh;
-            background: radial-gradient( circle at center, #f7f7f7 0%, #e8e8e8 35%, #d2d2d2 65%, #b8b8b8 100% );
+            /* радиальный градиент: светлее в центре */
+            background: radial-gradient( circle at center, #ffffff 0%, #eeeeee 35%, #d6d6d6 65%, #bcbcbc 100% );
+            position: relative;
         }
 
-        #viewer {
+        canvas {
             display: block;
-            width: 100%;
-            height: 100%;
         }
 
         #loader {
             position: absolute;
+            bottom: 30px;
             left: 50%;
-            bottom: 32px;
             transform: translateX(-50%);
-            width: 220px;
-            height: 8px;
-            background: rgba(0, 0, 0, 0.12);
-            border-radius: 999px;
+            width: 200px;
+            height: 6px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 3px;
             overflow: hidden;
         }
 
         #progress {
             width: 0%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.55);
-            transition: width 0.15s linear;
-        }
-
-        #error {
-            position: absolute;
-            left: 50%;
-            bottom: 50px;
-            transform: translateX(-50%);
-            padding: 10px 14px;
-            background: rgba(255,255,255,0.9);
-            color: #222;
-            border-radius: 10px;
-            font-size: 14px;
-            display: none;
-            max-width: 80vw;
-            text-align: center;
+            background: #555;
+            transition: width 0.2s;
         }
     </style>
 </head>
@@ -69,33 +52,24 @@
         <div id="loader">
             <div id="progress"></div>
         </div>
-
-        <div id="error"></div>
     </div>
 
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
+        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
+        import { RGBELoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/RGBELoader.js';
 
         const canvas = document.getElementById('viewer');
-        const progressEl = document.getElementById('progress');
-        const loaderEl = document.getElementById('loader');
-        const errorEl = document.getElementById('error');
-
         const renderer = new THREE.WebGLRenderer({
             canvas,
             antialias: true,
             alpha: true
         });
 
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setClearColor(0x000000, 0);
-
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.0;
 
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -105,157 +79,103 @@
         const camera = new THREE.PerspectiveCamera(
             45,
             window.innerWidth / window.innerHeight,
-            0.01,
+            0.1,
             1000
         );
-        camera.position.set(0, 1.2, 3);
+        camera.position.set(2, 1.5, 3);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.enablePan = false;
-        controls.minDistance = 0.2;
-        controls.maxDistance = 50;
-        controls.target.set(0, 0.6, 0);
 
-        // Свет. Без HDRI, чтобы не плодить лишние точки отказа.
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
-        scene.add(ambientLight);
+        // свет
+        const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+        scene.add(ambient);
 
-        const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
-        keyLight.position.set(4, 6, 5);
-        keyLight.castShadow = true;
-        keyLight.shadow.mapSize.width = 2048;
-        keyLight.shadow.mapSize.height = 2048;
-        keyLight.shadow.camera.near = 0.1;
-        keyLight.shadow.camera.far = 30;
-        keyLight.shadow.camera.left = -10;
-        keyLight.shadow.camera.right = 10;
-        keyLight.shadow.camera.top = 10;
-        keyLight.shadow.camera.bottom = -10;
-        scene.add(keyLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+        dirLight.position.set(3, 5, 4);
+        dirLight.castShadow = true;
 
-        const fillLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        fillLight.position.set(-3, 2, -4);
-        scene.add(fillLight);
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
 
-        // Пол под тень
+        scene.add(dirLight);
+
+        // пол для тени
         const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(50, 50),
-            new THREE.ShadowMaterial({ opacity: 0.18 })
+            new THREE.PlaneGeometry(20, 20),
+            new THREE.ShadowMaterial({ opacity: 0.2 })
         );
         floor.rotation.x = -Math.PI / 2;
         floor.position.y = -0.001;
         floor.receiveShadow = true;
         scene.add(floor);
 
+        // загрузка HDRI (для нормальных отражений)
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        new RGBELoader().load(
+            'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_03_1k.hdr',
+            (hdr) => {
+                const envMap = pmremGenerator.fromEquirectangular(hdr).texture;
+                scene.environment = envMap;
+                hdr.dispose();
+                pmremGenerator.dispose();
+            }
+        );
+
+        // загрузка модели
         const params = new URLSearchParams(window.location.search);
         const client = params.get('client') || 'demo';
         const product = params.get('product') || 'chair01';
 
         const modelUrl = `./StreamingAssets/clients/${client}/products/${product}/model.glb`;
-        console.log('Loading model:', modelUrl);
 
-        const gltfLoader = new GLTFLoader();
-        let currentModel = null;
+        const loader = new GLTFLoader();
+        const progressBar = document.getElementById('progress');
 
-        function showError(message) {
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
-        }
-
-        function fitCameraToObject(object) {
-            const box = new THREE.Box3().setFromObject(object);
-            const size = box.getSize(new THREE.Vector3());
-            const center = box.getCenter(new THREE.Vector3());
-
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-
-            cameraZ *= 1.8;
-
-            camera.position.set(center.x, center.y + maxDim * 0.2, center.z + cameraZ);
-
-            camera.near = Math.max(maxDim / 100, 0.01);
-            camera.far = Math.max(maxDim * 20, 100);
-            camera.updateProjectionMatrix();
-
-            controls.target.copy(center);
-            controls.minDistance = maxDim * 0.5;
-            controls.maxDistance = maxDim * 8;
-            controls.update();
-
-            floor.position.y = box.min.y - 0.001;
-        }
-
-        gltfLoader.load(
+        loader.load(
             modelUrl,
             (gltf) => {
-                if (currentModel) {
-                    scene.remove(currentModel);
-                }
+                const model = gltf.scene;
 
-                currentModel = gltf.scene;
-
-                currentModel.traverse((obj) => {
+                model.traverse((obj) => {
                     if (obj.isMesh) {
                         obj.castShadow = true;
                         obj.receiveShadow = true;
-
-                        if (obj.material) {
-                            if (Array.isArray(obj.material)) {
-                                obj.material.forEach((mat) => {
-                                    if ('envMapIntensity' in mat) mat.envMapIntensity = 1.0;
-                                    mat.needsUpdate = true;
-                                });
-                            } else {
-                                if ('envMapIntensity' in obj.material) obj.material.envMapIntensity = 1.0;
-                                obj.material.needsUpdate = true;
-                            }
-                        }
                     }
                 });
 
-                // Жестко центрируем модель в 0,0,0
-                const box = new THREE.Box3().setFromObject(currentModel);
+                // центрируем модель
+                const box = new THREE.Box3().setFromObject(model);
                 const center = box.getCenter(new THREE.Vector3());
-                currentModel.position.sub(center);
+                model.position.sub(center);
 
-                // После центрирования считаем заново
-                const newBox = new THREE.Box3().setFromObject(currentModel);
-                const minY = newBox.min.y;
-                currentModel.position.y -= minY;
+                // ставим на пол
+                const size = box.getSize(new THREE.Vector3());
+                model.position.y += size.y / 2;
 
-                scene.add(currentModel);
+                scene.add(model);
 
-                fitCameraToObject(currentModel);
-
-                loaderEl.style.display = 'none';
-                errorEl.style.display = 'none';
-
-                console.log('MODEL LOADED OK');
+                document.getElementById('loader').style.display = 'none';
             },
             (xhr) => {
-                if (xhr.total > 0) {
+                if (xhr.total) {
                     const percent = (xhr.loaded / xhr.total) * 100;
-                    progressEl.style.width = percent + '%';
+                    progressBar.style.width = percent + '%';
                 }
             },
-            (error) => {
-                console.error('MODEL LOAD ERROR:', error);
-                loaderEl.style.display = 'none';
-                showError(`Failed to load model: ${modelUrl}`);
+            (err) => {
+                console.error('Load error:', err);
             }
         );
 
-        function onResize() {
+        // ресайз
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+        });
 
-        window.addEventListener('resize', onResize);
-
+        // рендер
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
