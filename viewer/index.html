@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <title>3D Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -11,177 +11,314 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background: #1e1e1e;
+            font-family: Arial, sans-serif;
         }
 
-        #viewer-wrap {
+        #app {
             position: relative;
-            width: 100vw;
-            height: 100vh;
-            /* радиальный градиент */
-            background: radial-gradient( circle at center, #f5f5f5 0%, #e0e0e0 40%, #c8c8c8 70%, #a8a8a8 100% );
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e1e1e;
+            z-index: 10;
+        }
+
+        .loader {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            color: white;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .text {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 999px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: white;
+            transition: width 0.15s ease;
+        }
+
+            .progress-fill.indeterminate {
+                width: 40%;
+                position: absolute;
+                left: -40%;
+                animation: indeterminate 1.2s linear infinite;
+            }
+
+        .progress-text {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        #error {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            padding: 12px 14px;
+            color: white;
+            background: rgba(180, 40, 40, 0.95);
+            border-radius: 10px;
+            display: none;
+            z-index: 20;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.4;
         }
 
         canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
             display: block;
         }
 
-        #loader {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 200px;
-            height: 6px;
-            background: rgba(0,0,0,0.1);
-            border-radius: 3px;
-            overflow: hidden;
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
 
-        #progress {
-            width: 0%;
-            height: 100%;
-            background: #555;
+        @keyframes indeterminate {
+            0% {
+                left: -40%;
+            }
+
+            100% {
+                left: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="viewer-wrap">
-        <canvas id="viewer"></canvas>
-
-        <div id="loader">
-            <div id="progress"></div>
+    <div id="app">
+        <div id="loading">
+            <div class="loader">
+                <div class="spinner"></div>
+                <div class="text" id="loading-text">Starting...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill indeterminate" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">Starting...</div>
+            </div>
         </div>
+
+        <div id="error"></div>
     </div>
 
+    <script>
+        window.addEventListener('error', (e) => {
+            const errorEl = document.getElementById('error');
+            const loadingTextEl = document.getElementById('loading-text');
+            const progressTextEl = document.getElementById('progress-text');
+
+            loadingTextEl.textContent = 'JS error';
+            progressTextEl.textContent = 'Failed';
+            errorEl.style.display = 'block';
+            errorEl.textContent = `window.error:\n${e.message}\n${e.filename || ''}:${e.lineno || ''}`;
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            const errorEl = document.getElementById('error');
+            const loadingTextEl = document.getElementById('loading-text');
+            const progressTextEl = document.getElementById('progress-text');
+
+            loadingTextEl.textContent = 'Promise error';
+            progressTextEl.textContent = 'Failed';
+            errorEl.style.display = 'block';
+            errorEl.textContent = `unhandledrejection:\n${e.reason}`;
+        });
+    </script>
+
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
-        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/controls/OrbitControls.js';
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
+        import * as THREE from 'https://esm.sh/three@0.179.1';
+        import { OrbitControls } from 'https://esm.sh/three@0.179.1/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://esm.sh/three@0.179.1/examples/jsm/loaders/GLTFLoader.js';
 
-        const canvas = document.getElementById('viewer');
-        const progressBar = document.getElementById('progress');
-        const loader = document.getElementById('loader');
+        const app = document.getElementById('app');
+        const loadingEl = document.getElementById('loading');
+        const loadingTextEl = document.getElementById('loading-text');
+        const progressFillEl = document.getElementById('progress-fill');
+        const progressTextEl = document.getElementById('progress-text');
+        const errorEl = document.getElementById('error');
 
-        const renderer = new THREE.WebGLRenderer({
-            canvas,
-            antialias: true,
-            alpha: true
-        });
-
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setClearColor(0x000000, 0);
-
-        renderer.shadowMap.enabled = true;
-
-        const scene = new THREE.Scene();
-
-        const camera = new THREE.PerspectiveCamera(
-            45,
-            window.innerWidth / window.innerHeight,
-            0.01,
-            1000
-        );
-        camera.position.set(0, 1.5, 3);
-
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-
-        // свет (простой и стабильный)
-        const ambient = new THREE.AmbientLight(0xffffff, 1.5);
-        scene.add(ambient);
-
-        const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-        dirLight.position.set(3, 5, 4);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        // пол (тень)
-        const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(20, 20),
-            new THREE.ShadowMaterial({ opacity: 0.2 })
-        );
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.y = 0;
-        floor.receiveShadow = true;
-        scene.add(floor);
-
-        // параметры
-        const params = new URLSearchParams(window.location.search);
-        const client = params.get('client') || 'demo';
-        const product = params.get('product') || 'chair01';
-
-        const modelUrl = `./StreamingAssets/clients/${client}/products/${product}/model.glb`;
-        console.log('Loading:', modelUrl);
-
-        const loaderGLTF = new GLTFLoader();
-
-        loaderGLTF.load(
-            modelUrl,
-            (gltf) => {
-                const model = gltf.scene;
-
-                model.traverse((obj) => {
-                    if (obj.isMesh) {
-                        obj.castShadow = true;
-                        obj.receiveShadow = true;
-                    }
-                });
-
-                // центрирование
-                const box = new THREE.Box3().setFromObject(model);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-
-                model.position.sub(center);
-                model.position.y += size.y / 2;
-
-                scene.add(model);
-
-                // подгон камеры
-                const maxDim = Math.max(size.x, size.y, size.z);
-                const fov = camera.fov * (Math.PI / 180);
-                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-
-                cameraZ *= 1.8;
-                camera.position.set(0, maxDim * 0.6, cameraZ);
-
-                controls.target.set(0, size.y / 2, 0);
-                controls.update();
-
-                loader.style.display = 'none';
-
-                console.log('MODEL LOADED');
-            },
-            (xhr) => {
-                if (xhr.total) {
-                    const percent = (xhr.loaded / xhr.total) * 100;
-                    progressBar.style.width = percent + '%';
-                }
-            },
-            (err) => {
-                console.error('ERROR:', err);
-            }
-        );
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
+        function setProgress(percent, text = 'Loading...') {
+            progressFillEl.classList.remove('indeterminate');
+            const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+            progressFillEl.style.width = clamped + '%';
+            progressTextEl.textContent = clamped + '%';
+            loadingTextEl.textContent = text;
+            console.log('progress:', clamped, text);
         }
 
-        animate();
+        function setIndeterminate(text = 'Loading...') {
+            progressFillEl.classList.add('indeterminate');
+            progressFillEl.style.width = '40%';
+            progressTextEl.textContent = 'Loading...';
+            loadingTextEl.textContent = text;
+            console.log('indeterminate:', text);
+        }
+
+        function showError(message) {
+            console.error(message);
+            errorEl.style.display = 'block';
+            errorEl.textContent = String(message);
+            loadingTextEl.textContent = 'Error';
+            progressTextEl.textContent = 'Failed';
+        }
+
+        function getParam(name, fallback = '') {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name) || fallback;
+        }
+
+        function getConfigUrl(client, product) {
+            return `./StreamingAssets/clients/${encodeURIComponent(client)}/products/${encodeURIComponent(product)}/config.json`;
+        }
+
+        function getModelUrl(relativePath) {
+            return `./StreamingAssets/${relativePath}`;
+        }
+
+        function frameObject(camera, controls, object) {
+            const box = new THREE.Box3().setFromObject(object);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
+            const maxSize = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let distance = maxSize / (2 * Math.tan(fov / 2));
+            distance *= 1.6;
+
+            camera.position.set(center.x, center.y + maxSize * 0.15, center.z + distance);
+            camera.near = Math.max(distance / 100, 0.01);
+            camera.far = distance * 100;
+            camera.updateProjectionMatrix();
+
+            controls.target.copy(center);
+            controls.update();
+        }
+
+        async function main() {
+            const client = getParam('client', 'demo');
+            const product = getParam('product', 'sofa01');
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            app.appendChild(renderer.domElement);
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1e1e1e);
+
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+            scene.add(ambient);
+
+            const dir = new THREE.DirectionalLight(0xffffff, 2.0);
+            dir.position.set(3, 5, 4);
+            scene.add(dir);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            try {
+                setProgress(5, 'Loading config...');
+
+                const configUrl = getConfigUrl(client, product);
+                const configRes = await fetch(configUrl);
+
+                if (!configRes.ok) {
+                    throw new Error(`Failed to load config.json: ${configRes.status} ${configRes.statusText}\n${configUrl}`);
+                }
+
+                const config = await configRes.json();
+
+                if (!config.modelUrl) {
+                    throw new Error('config.json has no modelUrl');
+                }
+
+                setIndeterminate('Loading model...');
+
+                const modelUrl = getModelUrl(config.modelUrl);
+                const loader = new GLTFLoader();
+
+                const gltf = await new Promise((resolve, reject) => {
+                    loader.load(
+                        modelUrl,
+                        resolve,
+                        (event) => {
+                            if (event.total && event.total > 0) {
+                                const modelProgress = event.loaded / event.total;
+                                const percent = 15 + modelProgress * 80;
+                                setProgress(percent, 'Loading model...');
+                            } else {
+                                setIndeterminate('Loading model...');
+                            }
+                        },
+                        reject
+                    );
+                });
+
+                setProgress(97, 'Preparing scene...');
+
+                const model = gltf.scene;
+                scene.add(model);
+                frameObject(camera, controls, model);
+
+                setProgress(100, 'Done');
+
+                setTimeout(() => {
+                    loadingEl.style.display = 'none';
+                }, 150);
+
+                renderer.setAnimationLoop(() => {
+                    controls.update();
+                    renderer.render(scene, camera);
+                });
+            } catch (err) {
+                showError(err);
+            }
+        }
+
+        main();
     </script>
 </body>
 </html>
