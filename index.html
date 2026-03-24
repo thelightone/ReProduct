@@ -3,7 +3,6 @@
 <head>
     <meta charset="utf-8">
     <title>Viewer</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
@@ -34,11 +33,58 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 18px;
             background: #1e1e1e;
             z-index: 10;
+        }
+
+        .loader {
+            width: 260px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .text {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: white;
+            transition: width 0.15s ease;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -46,38 +92,54 @@
 <body>
     <div id="unity-container">
         <canvas id="unity-canvas"></canvas>
-        <div id="loading">Loading 3D...</div>
+
+        <div id="loading">
+            <div class="loader">
+                <div class="spinner"></div>
+                <div class="text">Loading 3D...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">0%</div>
+            </div>
+        </div>
     </div>
 
     <script>
-    const buildUrl = "Build";
-    const loaderUrl = buildUrl + "/Builds.loader.js";
+        const buildUrl = "Build";
+        const loaderUrl = buildUrl + "/Builds.loader.js";
 
-    const config = {
-      dataUrl: buildUrl + "/Builds.data",
-      frameworkUrl: buildUrl + "/Builds.framework.js",
-      codeUrl: buildUrl + "/Builds.wasm",
-      streamingAssetsUrl: "StreamingAssets",
-      companyName: "DefaultCompany",
-      productName: "Viewer",
-      productVersion: "1.0"
-    };
+        const config = {
+            dataUrl: buildUrl + "/Builds.data",
+            frameworkUrl: buildUrl + "/Builds.framework.js",
+            codeUrl: buildUrl + "/Builds.wasm",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "DefaultCompany",
+            productName: "Viewer",
+            productVersion: "1.0"
+        };
 
-    const canvas = document.querySelector("#unity-canvas");
-    const loading = document.querySelector("#loading");
+        const canvas = document.querySelector("#unity-canvas");
+        const loading = document.querySelector("#loading");
+        const progressFill = document.querySelector("#progress-fill");
+        const progressText = document.querySelector("#progress-text");
 
-    const script = document.createElement("script");
-    script.src = loaderUrl;
+        const script = document.createElement("script");
+        script.src = loaderUrl;
 
-    script.onload = () => {
-      createUnityInstance(canvas, config).then(() => {
-        loading.style.display = "none";
-      }).catch((message) => {
-        alert(message);
-      });
-    };
+        script.onload = () => {
+            createUnityInstance(canvas, config, (progress) => {
+                const percent = Math.round(progress * 100);
+                progressFill.style.width = percent + "%";
+                progressText.textContent = percent + "%";
+            }).then(() => {
+                loading.style.display = "none";
+            }).catch((message) => {
+                alert(message);
+            });
+        };
 
-    document.body.appendChild(script);
+        document.body.appendChild(script);
     </script>
 </body>
 </html>
