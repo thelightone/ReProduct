@@ -163,7 +163,7 @@
         import * as THREE from 'https://esm.sh/three@0.179.1';
         import { OrbitControls } from 'https://esm.sh/three@0.179.1/examples/jsm/controls/OrbitControls.js';
         import { GLTFLoader } from 'https://esm.sh/three@0.179.1/examples/jsm/loaders/GLTFLoader.js';
-        import * as MeshoptDecoder from 'https://esm.sh/meshoptimizer';
+        import { MeshoptDecoder } from 'https://unpkg.com/three@0.179.1/examples/jsm/libs/meshopt_decoder.module.js';
 
         const app = document.getElementById('app');
         const loadingEl = document.getElementById('loading');
@@ -322,8 +322,6 @@
 
                 const modelUrl = getModelUrl(config.modelUrl);
                 const loader = new GLTFLoader();
-
-                await MeshoptDecoder.ready;
                 loader.setMeshoptDecoder(MeshoptDecoder);
 
                 const gltf = await new Promise((resolve, reject) => {
