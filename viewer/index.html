@@ -177,7 +177,6 @@
             progressFillEl.style.width = clamped + '%';
             progressTextEl.textContent = clamped + '%';
             loadingTextEl.textContent = text;
-            console.log('progress:', clamped, text);
         }
 
         function setIndeterminate(text = 'Loading...') {
@@ -185,7 +184,6 @@
             progressFillEl.style.width = '40%';
             progressTextEl.textContent = 'Loading...';
             loadingTextEl.textContent = text;
-            console.log('indeterminate:', text);
         }
 
         function showError(message) {
@@ -215,16 +213,30 @@
             const center = box.getCenter(new THREE.Vector3());
 
             const maxSize = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            let distance = maxSize / (2 * Math.tan(fov / 2));
-            distance *= 1.6;
+            const fov = THREE.MathUtils.degToRad(camera.fov);
 
-            camera.position.set(center.x, center.y + maxSize * 0.15, center.z + distance);
+            let distance = maxSize / (2 * Math.tan(fov / 2));
+            distance *= 1.9;
+
+            const verticalOffset = size.y * 0.08;
+
+            camera.position.set(
+                center.x,
+                center.y + verticalOffset,
+                center.z + distance
+            );
+
             camera.near = Math.max(distance / 100, 0.01);
-            camera.far = distance * 100;
+            camera.far = Math.max(distance * 100, 1000);
             camera.updateProjectionMatrix();
 
-            controls.target.copy(center);
+            controls.target.set(center.x, center.y + verticalOffset * 0.5, center.z);
+
+            controls.minDistance = distance * 0.8;
+            controls.maxDistance = distance * 1.35;
+            controls.enablePan = false;
+            controls.maxPolarAngle = Math.PI * 0.56;
+            controls.minPolarAngle = Math.PI * 0.38;
             controls.update();
         }
 
@@ -241,13 +253,15 @@
             const scene = new THREE.Scene();
             scene.background = null;
 
-            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+            const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.01, 2000);
 
             const controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 1.5;
+            controls.autoRotateSpeed = 1.2;
+            controls.enablePan = false;
+            controls.screenSpacePanning = false;
 
             let autoRotateTimeout = null;
 
@@ -260,22 +274,31 @@
             }
 
             controls.addEventListener('start', pauseAutoRotate);
-
             renderer.domElement.addEventListener('pointerdown', pauseAutoRotate);
             renderer.domElement.addEventListener('wheel', pauseAutoRotate, { passive: true });
             renderer.domElement.addEventListener('touchstart', pauseAutoRotate, { passive: true });
 
-            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+            const ambient = new THREE.AmbientLight(0xffffff, 1.35);
             scene.add(ambient);
 
-            const dir = new THREE.DirectionalLight(0xffffff, 2.0);
-            dir.position.set(3, 5, 4);
-            scene.add(dir);
+            const dir1 = new THREE.DirectionalLight(0xffffff, 1.9);
+            dir1.position.set(4, 6, 5);
+            scene.add(dir1);
+
+            const dir2 = new THREE.DirectionalLight(0xffffff, 0.7);
+            dir2.position.set(-3, 2, -4);
+            scene.add(dir2);
+
+            let loadedModel = null;
 
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
+
+                if (loadedModel) {
+                    frameObject(camera, controls, loadedModel);
+                }
             });
 
             try {
@@ -318,9 +341,9 @@
 
                 setProgress(97, 'Preparing scene...');
 
-                const model = gltf.scene;
-                scene.add(model);
-                frameObject(camera, controls, model);
+                loadedModel = gltf.scene;
+                scene.add(loadedModel);
+                frameObject(camera, controls, loadedModel);
 
                 setProgress(100, 'Done');
 
