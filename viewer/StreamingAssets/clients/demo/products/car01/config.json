@@ -1,0 +1,6 @@
+{
+  "productId": "chair01",
+  "title": "Chair",
+  "basePrice": 500,
+  "modelUrl": "clients/demo/products/car01/model.glb"
+}
