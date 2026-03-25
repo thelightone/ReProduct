@@ -216,7 +216,7 @@
             const fov = THREE.MathUtils.degToRad(camera.fov);
 
             let distance = maxSize / (2 * Math.tan(fov / 2));
-            distance *= 1.9;
+            distance *= 1.3;
 
             const verticalOffset = size.y * 0.08;
 
@@ -259,7 +259,7 @@
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 1.2;
+            controls.autoRotateSpeed = 2;
             controls.enablePan = false;
             controls.screenSpacePanning = false;
 
