@@ -98,6 +98,23 @@
             line-height: 1.4;
         }
 
+        #watermark {
+            position: absolute;
+            right: 16px;
+            bottom: 16px;
+            padding: 6px 10px;
+            font-size: 14px;
+            line-height: 1;
+            color: rgba(255,255,255,0.72);
+            background: rgba(0,0,0,0.18);
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            pointer-events: none;
+            user-select: none;
+            z-index: 15;
+        }
+
         canvas {
             display: block;
         }
@@ -133,6 +150,7 @@
         </div>
 
         <div id="error"></div>
+        <div id="watermark">ReFactor3D.ru</div>
     </div>
 
     <script>
