@@ -1,0 +1,6 @@
+{
+        "productId": "sofa01",
+        "title": "Modern Sofa",
+        "basePrice": 1000,
+        "modelUrl": "clients/demo/products/sofa02/model.glb"
+}
